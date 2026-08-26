@@ -3,6 +3,8 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { CargoListing } from '../models/CargoListing';
 import { ProviderProfile } from '../models/ProviderProfile';
 import { AuditLog } from '../models/AuditLog';
+import { calculateIntelligentMatch } from '../services/intelligentMatchingService';
+import { TraderRequest } from '../models/TraderRequest';
 
 export const getCargoListings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -52,6 +54,57 @@ export const getCargoListings = async (req: AuthRequest, res: Response): Promise
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message || 'Server error fetching cargo listings.' });
+  }
+};
+
+export const intelligentMatchCargo = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { origin, destination, transportMode, departureDate, reqWeight, reqVolume, cargoType } = req.body;
+
+    const weight = Number(reqWeight) || 1000;
+    const volume = Number(reqVolume) || 4;
+
+    // Build search query for available containers
+    const query: any = {
+      status: 'Available',
+      availableWeight: { $gte: weight },
+      availableVolume: { $gte: volume },
+    };
+
+    if (origin) query.origin = { $regex: new RegExp(origin, 'i') };
+    if (destination) query.destination = { $regex: new RegExp(destination, 'i') };
+    if (transportMode && transportMode !== 'All') query.transportMode = transportMode;
+
+    const candidates = await CargoListing.find(query);
+
+    // Run Intelligent Matching Scoring Engine
+    const targetDate = departureDate ? new Date(departureDate) : undefined;
+    const matchResults = calculateIntelligentMatch(candidates, weight, volume, targetDate);
+
+    // Save/record trader request inquiry if trader is authenticated
+    if (req.user && req.user.role === 'TRADER' && origin && destination) {
+      await TraderRequest.create({
+        traderId: req.user._id,
+        traderName: req.user.fullName,
+        traderEmail: req.user.email,
+        origin,
+        destination,
+        transportMode: transportMode || 'All',
+        weightKg: weight,
+        volumeCbm: volume,
+        cargoType: cargoType || 'General Cargo',
+        targetDepartureDate: targetDate || new Date(),
+        status: matchResults.length > 0 ? 'Matched' : 'Pending',
+      });
+    }
+
+    res.json({
+      success: true,
+      count: matchResults.length,
+      matchResults,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Server error running intelligent matching.' });
   }
 };
 

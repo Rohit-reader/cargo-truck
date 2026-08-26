@@ -1,362 +1,278 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { ICargoListing, TransportMode, ContainerType } from '../types';
-import { Badge } from '../components/Badge';
-import { CapacityProgressBar } from '../components/CapacityProgressBar';
-import { Plus, Boxes, X, AlertCircle } from 'lucide-react';
+import { CargoCard } from '../components/CargoCard';
+import { FillMyContainerModal } from '../components/FillMyContainerModal';
+import { Boxes, Plus, X, Zap } from 'lucide-react';
 
 export const MyCargoSpacePage: React.FC = () => {
-  const [listings, setListings] = useState<ICargoListing[]>([]);
+  const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [optimizingListing, setOptimizingListing] = useState<any | null>(null);
 
+  // Form State for publishing new cargo space
   const [formData, setFormData] = useState({
-    transportMode: 'Sea' as TransportMode,
-    containerType: '20 FT' as ContainerType,
+    transportMode: 'Sea',
+    containerType: '20 FT',
     containerNumber: '',
     origin: '',
     destination: '',
     departureDate: '',
     estimatedArrival: '',
     pickupLocation: '',
-    totalWeightCapacity: 18000,
-    availableWeight: 18000,
+    totalWeightCapacity: 20000,
+    availableWeight: 20000,
     totalVolumeCapacity: 38,
     availableVolume: 38,
     pricePerKg: 45,
     pricePerCbm: 1200,
-    acceptedCargoType: 'General Goods, Textiles, Machinery Parts',
+    acceptedCargoType: 'General Cargo, Textiles, Engineering Goods',
   });
 
-  const fetchMyListings = async () => {
+  const fetchListings = async () => {
     try {
-      const res = await api.get('/cargo');
+      const res = await api.get('/providers/listings');
       if (res.data.success) {
-        setListings(res.data.cargoListings);
+        setListings(res.data.listings);
       }
     } catch (err) {
-      console.error('Error loading cargo space', err);
+      console.error('Failed to load listings', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMyListings();
+    fetchListings();
   }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: name.includes('Capacity') || name.includes('Weight') || name.includes('Volume') || name.includes('price') || name.includes('Price')
-        ? Number(value)
-        : value,
-    });
-  };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSubmitting(true);
-
     try {
       const res = await api.post('/cargo', formData);
       if (res.data.success) {
-        setShowModal(false);
-        fetchMyListings();
+        setShowCreateModal(false);
+        fetchListings();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to publish cargo capacity.');
-    } finally {
-      setSubmitting(false);
+      alert(err.response?.data?.message || 'Failed to publish cargo space.');
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
           <h1 className="text-2xl font-extrabold text-slate-900 flex items-center space-x-2">
             <Boxes className="h-6 w-6 text-blue-600" />
-            <span>My Published Cargo Space</span>
+            <span>My Cargo Space Listings</span>
           </h1>
           <p className="text-slate-500 text-sm">
-            Manage available container capacity across your logistics routes
+            Publish container capacity and run ⚡ Fill My Container optimization to maximize container revenue
           </p>
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-sm transition flex items-center space-x-1.5"
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition flex items-center space-x-1.5 shadow-xs"
         >
           <Plus className="h-4 w-4" />
-          <span>Publish Available Space</span>
+          <span>Publish Cargo Space</span>
         </button>
       </div>
 
-      {/* Cargo Space Table / List */}
       {loading ? (
         <div className="text-center py-16 text-slate-400 font-semibold">Loading cargo listings...</div>
       ) : listings.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4">
-          <Boxes className="h-10 w-10 text-slate-300 mx-auto" />
-          <h3 className="text-lg font-bold text-slate-900">No Cargo Space Listed</h3>
-          <p className="text-slate-500 text-sm">Publish your first partially filled container to start receiving bookings.</p>
+          <p className="text-slate-500 text-sm font-medium">You haven't published any container space yet.</p>
           <button
-            onClick={() => setShowModal(true)}
-            className="px-5 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl"
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl text-xs"
           >
-            Publish Cargo Space
+            Publish Your First Cargo Space
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {listings.map((listing) => (
-            <div key={listing._id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-lg">
-                    {listing.origin} → {listing.destination}
-                  </h3>
-                  <span className="text-xs font-semibold text-slate-500">
-                    {listing.transportMode} • {listing.containerType} ({listing.containerNumber})
-                  </span>
-                </div>
-                <Badge status={listing.status} />
-              </div>
+            <div key={listing._id} className="space-y-3 flex flex-col justify-between">
+              {/* Fill My Container Optimization CTA */}
+              <button
+                onClick={() => setOptimizingListing(listing)}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white font-extrabold rounded-2xl text-xs transition flex items-center justify-center space-x-2 shadow-sm"
+              >
+                <Zap className="h-4 w-4 text-yellow-400 fill-current" />
+                <span>⚡ Fill My Container Optimization</span>
+              </button>
 
-              <div className="space-y-3">
-                <CapacityProgressBar
-                  label="Weight"
-                  total={listing.totalWeightCapacity}
-                  available={listing.availableWeight}
-                  unit="KG"
-                />
-                <CapacityProgressBar
-                  label="Volume"
-                  total={listing.totalVolumeCapacity}
-                  available={listing.availableVolume}
-                  unit="CBM"
-                />
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-600">
-                <span>Freight Rate: <strong className="text-blue-700 font-extrabold text-sm">₹{listing.pricePerKg} / KG</strong></span>
-                <span>Departs: <strong className="text-slate-800">{new Date(listing.departureDate).toLocaleDateString('en-GB')}</strong></span>
-              </div>
+              <CargoCard listing={listing} />
             </div>
           ))}
         </div>
       )}
 
-      {/* Modal for Creating New Cargo Space */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h2 className="text-lg font-extrabold text-slate-900">Publish Available Cargo Capacity</h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+      {/* Fill My Container Optimization Modal */}
+      {optimizingListing && (
+        <FillMyContainerModal
+          listing={optimizingListing}
+          isOpen={!!optimizingListing}
+          onClose={() => setOptimizingListing(null)}
+        />
+      )}
+
+      {/* Publish Cargo Space Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h2 className="text-lg font-extrabold text-slate-900">Publish New Cargo Space</h2>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {error && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-semibold flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Transport Mode *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Transport Mode</label>
                   <select
-                    name="transportMode"
                     value={formData.transportMode}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white"
+                    onChange={(e) => setFormData({ ...formData, transportMode: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl font-semibold"
                   >
-                    <option value="Sea">Sea Freight</option>
-                    <option value="Road">Road Haulage</option>
-                    <option value="Rail">Rail Transport</option>
-                    <option value="Air">Air Cargo</option>
-                    <option value="Multimodal">Multimodal</option>
+                    <option value="Sea">Sea</option>
+                    <option value="Road">Road</option>
+                    <option value="Rail">Rail</option>
+                    <option value="Air">Air</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Container Type *</label>
-                  <select
-                    name="containerType"
-                    value={formData.containerType}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white"
-                  >
-                    <option value="20 FT">20 FT Container</option>
-                    <option value="40 FT">40 FT Container</option>
-                    <option value="40 FT High Cube">40 FT High Cube</option>
-                    <option value="Other">Other Truck / Trailer</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Container Number *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Container Number / Vehicle ID</label>
                   <input
                     type="text"
-                    name="containerNumber"
                     required
-                    value={formData.containerNumber}
-                    onChange={handleChange}
                     placeholder="MSCU-902144-8"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Origin *</label>
-                  <input
-                    type="text"
-                    name="origin"
-                    required
-                    value={formData.origin}
-                    onChange={handleChange}
-                    placeholder="Chennai"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Destination *</label>
-                  <input
-                    type="text"
-                    name="destination"
-                    required
-                    value={formData.destination}
-                    onChange={handleChange}
-                    placeholder="Dubai"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm"
+                    value={formData.containerNumber}
+                    onChange={(e) => setFormData({ ...formData, containerNumber: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Departure Date *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Origin City/Port</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Chennai Port"
+                    value={formData.origin}
+                    onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Destination City/Port</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Dubai Jebel Ali"
+                    value={formData.destination}
+                    onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Departure Date</label>
                   <input
                     type="date"
-                    name="departureDate"
                     required
                     value={formData.departureDate}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white"
+                    onChange={(e) => setFormData({ ...formData, departureDate: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Estimated Arrival *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Estimated Arrival Date</label>
                   <input
                     type="date"
-                    name="estimatedArrival"
                     required
                     value={formData.estimatedArrival}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white"
+                    onChange={(e) => setFormData({ ...formData, estimatedArrival: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Total Weight Capacity (KG)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.totalWeightCapacity}
+                    onChange={(e) => setFormData({ ...formData, totalWeightCapacity: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Total Volume Capacity (CBM)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.totalVolumeCapacity}
+                    onChange={(e) => setFormData({ ...formData, totalVolumeCapacity: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Freight Rate per KG (₹)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.pricePerKg}
+                    onChange={(e) => setFormData({ ...formData, pricePerKg: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Freight Rate per CBM (₹)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.pricePerCbm}
+                    onChange={(e) => setFormData({ ...formData, pricePerCbm: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Pickup Location / Freight Station *</label>
+                <label className="block font-bold text-slate-700 mb-1">Pickup Facility Address</label>
                 <input
                   type="text"
-                  name="pickupLocation"
                   required
+                  placeholder="Container Freight Station Gate 4, Chennai"
                   value={formData.pickupLocation}
-                  onChange={handleChange}
-                  placeholder="Chennai Port CFS Gate 4"
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm"
+                  onChange={(e) => setFormData({ ...formData, pickupLocation: e.target.value })}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Available Weight (KG) *</label>
-                  <input
-                    type="number"
-                    name="availableWeight"
-                    required
-                    min={1}
-                    value={formData.availableWeight}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Available Volume (CBM) *</label>
-                  <input
-                    type="number"
-                    name="availableVolume"
-                    required
-                    min={1}
-                    value={formData.availableVolume}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Freight Rate per KG (₹) *</label>
-                  <input
-                    type="number"
-                    name="pricePerKg"
-                    required
-                    min={1}
-                    value={formData.pricePerKg}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-bold text-blue-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Freight Rate per CBM (₹) *</label>
-                  <input
-                    type="number"
-                    name="pricePerCbm"
-                    required
-                    min={1}
-                    value={formData.pricePerCbm}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-bold text-blue-700"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-semibold text-sm rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-sm"
-                >
-                  {submitting ? 'Publishing...' : 'Publish Container Space'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition mt-2"
+              >
+                Publish Space & Open for Bookings
+              </button>
             </form>
           </div>
         </div>

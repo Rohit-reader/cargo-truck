@@ -1,34 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { IProviderProfile, IBooking } from '../types';
-import { useAuth } from '../context/AuthContext';
-import { Badge } from '../components/Badge';
-import { Boxes, PackageCheck, CreditCard, Star, ShieldCheck, Plus, TrendingUp } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { CapacityProgressBar } from '../components/CapacityProgressBar';
+import { FillMyContainerModal } from '../components/FillMyContainerModal';
+import { LayoutDashboard, Boxes, PackageCheck, Zap, ShieldAlert, ArrowRight } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export const ProviderDashboardPage: React.FC = () => {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<IProviderProfile | null>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [bookings, setBookings] = useState<IBooking[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [optimizingListing, setOptimizingListing] = useState<any | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       try {
-        const [profRes, bookRes] = await Promise.all([
-          api.get('/providers/profile'),
-          api.get('/bookings'),
+        const [profileRes, listingsRes] = await Promise.all([
+          api.get('/providers/me'),
+          api.get('/providers/listings'),
         ]);
 
-        if (profRes.data.success) {
-          setProfile(profRes.data.provider);
-          setStats(profRes.data.stats);
-        }
-        if (bookRes.data.success) {
-          setBookings(bookRes.data.bookings);
-        }
+        if (profileRes.data.success) setProfile(profileRes.data.profile);
+        if (listingsRes.data.success) setListings(listingsRes.data.listings);
       } catch (err) {
         console.error('Failed to load provider dashboard data', err);
       } finally {
@@ -36,181 +29,170 @@ export const ProviderDashboardPage: React.FC = () => {
       }
     };
 
-    fetchData();
+    loadData();
   }, []);
 
-  const chartData = [
-    { name: 'Chennai → Dubai', weightBooked: 6000, capacity: 18000 },
-    { name: 'Chennai → Singapore', weightBooked: 4000, capacity: 26000 },
-    { name: 'Chennai → Colombo', weightBooked: 6500, capacity: 15000 },
-    { name: 'Chennai → Mumbai', weightBooked: 9000, capacity: 24000 },
-    { name: 'Coimbatore → Chennai', weightBooked: 3000, capacity: 12000 },
-  ];
-
   if (loading) {
-    return <div className="text-center py-20 text-slate-400 font-semibold">Loading provider dashboard...</div>;
+    return <div className="text-center py-16 text-slate-400 font-semibold">Loading Provider Portal...</div>;
   }
+
+  // Calculate stats & chart data
+  const totalCapacityKg = listings.reduce((acc, l) => acc + l.totalWeightCapacity, 0);
+  const availableCapacityKg = listings.reduce((acc, l) => acc + l.availableWeight, 0);
+  const bookedCapacityKg = totalCapacityKg - availableCapacityKg;
+  const overallUtilPct = totalCapacityKg > 0 ? Math.round((bookedCapacityKg / totalCapacityKg) * 100) : 0;
+
+  const chartData = listings.map((l) => {
+    const booked = l.totalWeightCapacity - l.availableWeight;
+    return {
+      container: l.containerNumber.split('-')[0] || l.containerNumber,
+      BookedKG: booked,
+      AvailableKG: l.availableWeight,
+    };
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Provider Header Banner */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-extrabold text-slate-900">{profile?.companyName}</h1>
-            {profile?.verificationStatus === 'Approved' ? (
-              <span className="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                <ShieldCheck className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                Verified Provider
-              </span>
-            ) : (
-              <Badge status={profile?.verificationStatus || 'Pending'} />
-            )}
+      {/* Verification Alert Banner */}
+      {profile?.verificationStatus !== 'Approved' && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <ShieldAlert className="h-6 w-6 text-amber-600 shrink-0" />
+            <div>
+              <h3 className="font-extrabold text-amber-900 text-sm">Account Verification Under Review</h3>
+              <p className="text-xs text-amber-700">
+                Please upload required business registration documents to publish cargo space on Sutrivazhi.
+              </p>
+            </div>
           </div>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Logistics Provider Portal • Manage container listings, incoming bookings & shipment updates
+          <Link
+            to="/provider/verification"
+            className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-xl text-xs whitespace-nowrap shadow-xs"
+          >
+            Upload Documents
+          </Link>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 flex items-center space-x-2">
+            <LayoutDashboard className="h-7 w-7 text-blue-600" />
+            <span>Logistics Provider Portal</span>
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            {profile?.companyName || 'Verified Logistics Provider'} • Data Quality Rating: {profile?.dataQualityScore || 94}%
           </p>
         </div>
 
         <Link
           to="/provider/cargo-space"
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-sm transition flex items-center space-x-1.5 whitespace-nowrap"
+          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition flex items-center space-x-2 shadow-xs self-start md:self-auto"
         >
-          <Plus className="h-4 w-4" />
-          <span>Publish Cargo Space</span>
+          <Boxes className="h-4 w-4" />
+          <span>Manage Container Listings</span>
         </Link>
       </div>
 
-      {/* Verification Alert if Pending */}
-      {profile?.verificationStatus !== 'Approved' && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-xs text-amber-800 flex items-center justify-between">
-          <div>
-            <span className="font-bold block text-sm">Provider Application Under Review</span>
-            <span>Upload verification documents to complete your Admin approval.</span>
-          </div>
-          <Link
-            to="/provider/verification"
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-xs transition"
-          >
-            Upload Verification Docs
-          </Link>
-        </div>
-      )}
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase">Active Space</span>
-          <span className="text-2xl font-extrabold text-slate-900 block">{stats?.activeCargoSpace || 0}</span>
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <span className="text-xs font-bold uppercase text-slate-400">Total Active Containers</span>
+          <span className="block text-3xl font-black text-slate-900">{listings.length}</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase">Total Bookings</span>
-          <span className="text-2xl font-extrabold text-slate-900 block">{stats?.totalBookings || 0}</span>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <span className="text-xs font-bold uppercase text-slate-400">Overall Capacity Fill Rate</span>
+          <span className="block text-3xl font-black text-blue-600">{overallUtilPct}%</span>
+          <span className="text-xs text-slate-500 font-medium">Across active container fleet</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase">Pending</span>
-          <span className="text-2xl font-extrabold text-amber-600 block">{stats?.pendingBookings || 0}</span>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <span className="text-xs font-bold uppercase text-slate-400">Booked Capacity</span>
+          <span className="block text-3xl font-black text-emerald-600">{bookedCapacityKg.toLocaleString()} KG</span>
+          <span className="text-xs text-slate-500 font-medium">Secured cargo consignments</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase">Revenue</span>
-          <span className="text-xl font-extrabold text-emerald-700 block">₹{(stats?.revenue || 0).toLocaleString()}</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase">Utilization</span>
-          <span className="text-2xl font-extrabold text-blue-600 block">{stats?.utilizationRate || 0}%</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase">Customer Rating</span>
-          <span className="text-2xl font-extrabold text-amber-500 block flex items-center space-x-1">
-            <Star className="h-4 w-4 fill-current" />
-            <span>{profile?.rating || 4.8}</span>
-          </span>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <span className="text-xs font-bold uppercase text-slate-400">Unused Available Space</span>
+          <span className="block text-3xl font-black text-amber-600">{availableCapacityKg.toLocaleString()} KG</span>
+          <span className="text-xs text-slate-500 font-medium">Ready for optimization</span>
         </div>
       </div>
 
-      {/* Utilization Chart (Recharts) */}
+      {/* Utilization Chart */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2">
-          <TrendingUp className="h-5 w-5 text-blue-600" />
-          <span>Container Capacity Utilization Analytics</span>
-        </h3>
+        <h2 className="text-lg font-extrabold text-slate-900">Container Capacity Utilization Bar Chart</h2>
 
-        <div className="h-64 w-full pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
-              <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-              />
-              <Bar dataKey="weightBooked" fill="#2563eb" radius={[4, 4, 0, 0]} name="Booked Weight (KG)" />
-              <Bar dataKey="capacity" fill="#cbd5e1" radius={[4, 4, 0, 0]} name="Total Capacity (KG)" />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="h-64 w-full">
+          {chartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-slate-400 font-medium text-sm">
+              No container capacity data to chart.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="container" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="BookedKG" fill="#2563eb" name="Booked KG" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="AvailableKG" fill="#cbd5e1" name="Available KG" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
-      {/* Recent Bookings Received */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+      {/* Active Listings with ⚡ Fill My Container Action */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-900 text-base">Incoming Trader Bookings</h3>
-          <Link to="/provider/bookings" className="text-xs font-bold text-blue-600 hover:underline">
-            Manage All Bookings
+          <h2 className="text-lg font-extrabold text-slate-900">Active Container Capacity</h2>
+          <Link to="/provider/cargo-space" className="text-xs font-bold text-blue-600 hover:underline">
+            View All
           </Link>
         </div>
 
-        {bookings.length === 0 ? (
-          <div className="text-center py-8 text-slate-400 text-sm">No bookings received yet.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-700">
-              <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Booking Ref</th>
-                  <th className="px-4 py-3">Trader</th>
-                  <th className="px-4 py-3">Route</th>
-                  <th className="px-4 py-3">Reserved Weight</th>
-                  <th className="px-4 py-3">Freight Value</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {bookings.map((booking) => (
-                  <tr key={booking._id} className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-bold text-slate-900">{booking.bookingNumber}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">{booking.traderName}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {booking.route.origin} → {booking.route.destination}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{booking.cargoDetails.weightKg} KG</td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{booking.priceSummary.baseFreight.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={booking.bookingStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        to="/provider/bookings"
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition"
-                      >
-                        Update Status
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {listings.map((l) => (
+            <div key={l._id} className="p-4 border border-slate-200 rounded-2xl space-y-3 bg-slate-50/50">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm">
+                    {l.origin} → {l.destination} ({l.transportMode})
+                  </h3>
+                  <span className="text-xs text-slate-500 font-medium">Container {l.containerNumber}</span>
+                </div>
+
+                <button
+                  onClick={() => setOptimizingListing(l)}
+                  className="px-3 py-1.5 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white font-extrabold rounded-xl text-xs transition flex items-center space-x-1.5 shadow-2xs"
+                >
+                  <Zap className="h-3.5 w-3.5 text-yellow-400 fill-current" />
+                  <span>⚡ Fill My Container</span>
+                </button>
+              </div>
+
+              <CapacityProgressBar
+                total={l.totalWeightCapacity}
+                available={l.availableWeight}
+                unit="KG"
+                label="Weight Space"
+              />
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Fill My Container Optimization Modal */}
+      {optimizingListing && (
+        <FillMyContainerModal
+          listing={optimizingListing}
+          isOpen={!!optimizingListing}
+          onClose={() => setOptimizingListing(null)}
+        />
+      )}
     </div>
   );
 };

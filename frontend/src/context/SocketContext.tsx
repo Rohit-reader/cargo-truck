@@ -24,7 +24,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const newSocket = io(window.location.origin, {
+    const socketServerUrl = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+      : window.location.origin;
+
+    const newSocket = io(socketServerUrl, {
       transports: ['websocket', 'polling'],
     });
 

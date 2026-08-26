@@ -25,10 +25,32 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5174',
+  'https://cargotruck.vercel.app',
+];
+
+const customOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map((url) => url.trim()).filter(Boolean)
+  : [];
+
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...customOrigins]));
+
+const checkOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (!origin) return callback(null, true);
+  if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+    return callback(null, true);
+  }
+  return callback(null, false);
+};
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || '*',
+    origin: checkOrigin,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
@@ -36,7 +58,7 @@ const io = new Server(server, {
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || '*',
+    origin: checkOrigin,
     credentials: true,
   })
 );

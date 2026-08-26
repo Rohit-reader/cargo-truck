@@ -10,6 +10,7 @@ import { Booking } from '../models/Booking';
 import { Payment } from '../models/Payment';
 import { Conversation, Message } from '../models/Conversation';
 import { AuditLog } from '../models/AuditLog';
+import { TraderRequest } from '../models/TraderRequest';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ export const seedDatabase = async (forceClear: boolean = false) => {
     await Conversation.deleteMany({});
     await Message.deleteMany({});
     await AuditLog.deleteMany({});
+    await TraderRequest.deleteMany({});
 
     console.log('[Seed] Creating demo users...');
     const defaultPassword = await bcrypt.hash('12345', 10);
@@ -393,6 +395,75 @@ export const seedDatabase = async (forceClear: boolean = false) => {
       targetResource: 'System',
       details: 'Initial database seeding completed with updated credentials.',
     });
+
+    console.log('[Seed] Seeding sample trader requests for container optimization...');
+    await TraderRequest.create([
+      {
+        traderId: traderUser._id,
+        traderName: traderUser.fullName,
+        traderEmail: traderUser.email,
+        origin: 'Chennai',
+        destination: 'Dubai',
+        transportMode: 'Sea',
+        weightKg: 2500,
+        volumeCbm: 8,
+        cargoType: 'Textiles & Leather Apparel',
+        targetDepartureDate: addDays(now, 5),
+        status: 'Pending',
+      },
+      {
+        traderId: traderUser._id,
+        traderName: traderUser.fullName,
+        traderEmail: traderUser.email,
+        origin: 'Chennai',
+        destination: 'Dubai',
+        transportMode: 'Sea',
+        weightKg: 4000,
+        volumeCbm: 12,
+        cargoType: 'Automotive Precision Tools',
+        targetDepartureDate: addDays(now, 5),
+        status: 'Pending',
+      },
+      {
+        traderId: traderUser._id,
+        traderName: traderUser.fullName,
+        traderEmail: traderUser.email,
+        origin: 'Chennai',
+        destination: 'Dubai',
+        transportMode: 'Sea',
+        weightKg: 3500,
+        volumeCbm: 9,
+        cargoType: 'Spices & Organic Tea',
+        targetDepartureDate: addDays(now, 5),
+        status: 'Pending',
+      },
+      {
+        traderId: traderUser._id,
+        traderName: traderUser.fullName,
+        traderEmail: traderUser.email,
+        origin: 'Chennai',
+        destination: 'Singapore',
+        transportMode: 'Sea',
+        weightKg: 5000,
+        volumeCbm: 14,
+        cargoType: 'Electronic Hardware',
+        targetDepartureDate: addDays(now, 8),
+        status: 'Pending',
+      },
+      {
+        traderId: traderUser._id,
+        traderName: traderUser.fullName,
+        traderEmail: traderUser.email,
+        origin: 'Chennai',
+        destination: 'Mumbai',
+        transportMode: 'Rail',
+        weightKg: 6000,
+        volumeCbm: 18,
+        cargoType: 'Industrial Valves',
+        targetDepartureDate: addDays(now, 2),
+        status: 'Pending',
+      },
+    ]);
 
     console.log('[Seed] Data seeded successfully!');
     console.log('----------------------------------------------------');
