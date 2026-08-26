@@ -2,6 +2,6 @@
   "name": "cargotruck-root",
   "private": true,
   "scripts": {
-    "build": "npm run build --prefix frontend && node -e \"require('fs').cpSync('frontend/dist', 'dist', {recursive: true})\""
+    "build": "npm install --prefix frontend && npm run build --prefix frontend && node -e \"require('fs').cpSync('frontend/dist', 'dist', {recursive: true})\""
   }
 }
