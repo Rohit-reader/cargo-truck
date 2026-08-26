@@ -1,0 +1,7 @@
+{
+  "name": "cargotruck-root",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix frontend && node -e \"require('fs').cpSync('frontend/dist', 'dist', {recursive: true})\""
+  }
+}
